@@ -1,0 +1,34 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    dir: apps/web
+    args: ["build", "-t", "gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_TAG}", "."]
+  - name: gcr.io/cloud-builders/docker
+    args: ["push", "gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_TAG}"]
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      [
+        "gcloud","run","deploy","recontent-web",
+        "--image","gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_TAG}",
+        "--region","us-central1",
+        "--allow-unauthenticated",
+        "--service-account","recontent-api-sa@$PROJECT_ID.iam.gserviceaccount.com",
+        "--set-env-vars","NEXT_PUBLIC_API_BASE_URL=${_NEXT_PUBLIC_API_BASE_URL}",
+        "--set-env-vars","CHECKOUT_SUCCESS_URL=${_CHECKOUT_SUCCESS_URL}",
+        "--set-env-vars","CHECKOUT_CANCEL_URL=${_CHECKOUT_CANCEL_URL}",
+        "--update-secrets","STRIPE_SECRET_KEY=stripe-secret:latest",
+        "--update-secrets","NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=stripe-pk:latest",
+        "--set-env-vars","STRIPE_PRICE_SETUP=${_STRIPE_PRICE_SETUP}",
+        "--set-env-vars","STRIPE_PRICE_BASIC=${_STRIPE_PRICE_BASIC}",
+        "--set-env-vars","STRIPE_PRICE_PRO=${_STRIPE_PRICE_PRO}",
+        "--set-env-vars","STRIPE_PRICE_PREMIUM=${_STRIPE_PRICE_PREMIUM}"
+      ]
+substitutions:
+  _IMAGE_NAME: recontent-web
+  _TAG: v1
+  _NEXT_PUBLIC_API_BASE_URL: https://REPLACE_API_URL
+  _CHECKOUT_SUCCESS_URL: https://REPLACE_WEB_URL/success
+  _CHECKOUT_CANCEL_URL: https://REPLACE_WEB_URL/cancel
+  _STRIPE_PRICE_SETUP: price_SETUPFEE_ID
+  _STRIPE_PRICE_BASIC: price_BASIC_ID
+  _STRIPE_PRICE_PRO: price_PRO_ID
+  _STRIPE_PRICE_PREMIUM: price_PREMIUM_ID

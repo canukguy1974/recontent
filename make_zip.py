@@ -1177,7 +1177,7 @@ add(
 buf = io.BytesIO()
 with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
     for path, content in files.items():
-        z.writestr(f"recontent/{path}", content)
+        z.writestr(path, content)
 
 with open("recontent.zip", "wb") as f:
     f.write(buf.getvalue())
