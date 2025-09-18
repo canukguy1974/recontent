@@ -1,11 +1,17 @@
 "use client";
 import { useState } from "react";
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL!;
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
-async function getUploadUrl(orgId: number) {
-  const res = await fetch(`${apiBase}/assets/upload-url?org_id=${orgId}&content_type=${encodeURIComponent("image/jpeg")}`);
-  return (await res.json()) as Promise<{ url: string; gcs_uri: string }>;
+async function getUploadUrl(orgId: number, mimeType: string) {
+  const res = await fetch(
+    `${apiBase}/assets/upload-url?org_id=${orgId}&content_type=${encodeURIComponent(mimeType || "image/jpeg")}`
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`upload-url failed: ${res.status} ${res.statusText} ${text}`);
+  }
+  return (await res.json()) as { url: string; gcs_uri: string };
 }
 
 export default function Upload() {
@@ -18,17 +24,33 @@ export default function Upload() {
   const upload = async () => {
     if (!file) return;
     setStatus("Requesting signed URL…");
-    const { url, gcs_uri } = await getUploadUrl(orgId);
-    setStatus("Uploading to GCS…");
-    await fetch(url, {
-      method: "PUT",
-      headers: { "content-type": file.type || "image/jpeg" },
-      body: file,
-    });
-    setGcsUri(gcs_uri);
-    const v = await fetch(`${apiBase}/assets/view-url?gcs_uri=${encodeURIComponent(gcs_uri)}`).then((r) => r.json());
-    setViewUrl(v.url);
-    setStatus("Uploaded!");
+    try {
+      const mime = file.type || "image/jpeg";
+      const { url, gcs_uri } = await getUploadUrl(orgId, mime);
+      setStatus("Uploading to GCS…");
+      const putRes = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": mime },
+        body: file,
+      });
+      if (!putRes.ok) {
+        const text = await putRes.text().catch(() => "");
+        throw new Error(`PUT failed: ${putRes.status} ${putRes.statusText} ${text}`);
+      }
+      setGcsUri(gcs_uri);
+      const vRes = await fetch(
+        `${apiBase}/assets/view-url?gcs_uri=${encodeURIComponent(gcs_uri)}`
+      );
+      if (!vRes.ok) {
+        const text = await vRes.text().catch(() => "");
+        throw new Error(`view-url failed: ${vRes.status} ${vRes.statusText} ${text}`);
+      }
+      const v = await vRes.json();
+      setViewUrl(v.url);
+      setStatus("Uploaded!");
+    } catch (err: any) {
+      setStatus(err?.message || String(err));
+    }
   };
 
   return (
