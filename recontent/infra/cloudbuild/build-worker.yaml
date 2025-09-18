@@ -1,0 +1,16 @@
+steps:
+- name: gcr.io/cloud-builders/docker
+  args: ["build","-t","gcr.io/$PROJECT_ID/recontent-worker:$_TAG","."]
+  dir: "."
+- name: gcr.io/cloud-builders/docker
+  args: ["push","gcr.io/$PROJECT_ID/recontent-worker:$_TAG"]
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  args: [
+    "gcloud","run","deploy","recontent-worker",
+    "--image","gcr.io/$PROJECT_ID/recontent-worker:$_TAG",
+    "--region","us-central1","--allow-unauthenticated",
+    "--service-account","recontent-worker-sa@recontent-472506.iam.gserviceaccount.com",
+    "--set-env-vars","GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET_PROCESSED=recontent-processed,MOCK_AI=1"
+  ]
+substitutions:
+  _TAG: "v1"
