@@ -32,4 +32,8 @@ app.add_middleware(
 )
 
 
+app.include_router(health.router, tags=["system"])
+app.include_router(uploads.router, prefix="/assets", tags=["assets"])
+app.include_router(jobs.router, tags=["jobs"])
+app.include_router(stripe_webhooks.router, tags=["billing"])
 app.include_router(nlp.router, prefix="/nlp", tags=["nlp"])

@@ -1,11 +1,14 @@
 terraform {
   required_providers {
-    google = { source = "hashicorp/google" version = "> 5.40" }
-    random = { source = "hashicorp/random" version = "> 3.6" }
+    google = { source = "hashicorp/google", version = "> 5.40" }
+    random = { source = "hashicorp/random", version = "> 3.6" }
   }
 }
 
-provider "google" { project = var.project_id region = var.region }
+provider "google" { 
+  project = var.project_id 
+  region  = var.region 
+}
 
 resource "google_storage_bucket" "raw" {
   name = var.raw_bucket
@@ -102,7 +105,10 @@ resource "google_sql_database" "db" {
   instance = google_sql_database_instance.pg.name
 }
 
-resource "random_password" "db_password" { length = 20 special = true }
+resource "random_password" "db_password" { 
+  length  = 20 
+  special = true 
+}
 
 resource "google_sql_user" "dbuser" {
   name     = var.db_user
@@ -110,10 +116,23 @@ resource "google_sql_user" "dbuser" {
   password = random_password.db_password.result
 }
 
-output "instance_connection_name" { value = google_sql_database_instance.pg.connection_name }
-output "db_user" { value = google_sql_user.dbuser.name }
-output "db_password" { value = random_password.db_password.result sensitive = true }
-output "pubsub_topic" { value = google_pubsub_topic.jobs.name }
+output "instance_connection_name" { 
+  value = google_sql_database_instance.pg.connection_name 
+}
+
+output "db_user" { 
+  value = google_sql_user.dbuser.name 
+}
+
+output "db_password" { 
+  value     = random_password.db_password.result 
+  sensitive = true 
+}
+
+output "pubsub_topic" { 
+  value = google_pubsub_topic.jobs.name 
+}
+
 output "buckets" {
   value = {
     raw       = google_storage_bucket.raw.name

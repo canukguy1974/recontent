@@ -16,20 +16,37 @@ export default function Compose() {
     setStatus("");
     setLoading(true);
     setResult(null);
-    // TODO: Call backend API for NLP processing
-    // Example placeholder
-    setTimeout(() => {
-      setResult({
-        imageUrl: "https://placehold.co/600x400?text=Composed+Image",
-        caption: "Open house Sat and Sun 1-4 at 500 Some Street",
-        facts: [
-          "Spacious living room with natural light",
-          "Recently renovated kitchen with modern appliances"
-        ],
-        cta: "Contact us to schedule a tour!"
+    
+    try {
+      const response = await fetch(`${apiBase}/nlp/compose`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          user_id: 1, // TODO: Get from auth context
+          org_id: 1,  // TODO: Get from auth context
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResult({
+        imageUrl: data.image_url,
+        caption: data.caption,
+        facts: data.facts,
+        cta: data.cta
+      });
+    } catch (error) {
+      console.error("Error calling NLP API:", error);
+      setStatus("Failed to generate content. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   return (

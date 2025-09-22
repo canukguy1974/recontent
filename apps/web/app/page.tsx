@@ -57,6 +57,8 @@ export default function Page() {
         <a className="underline" href="/upload">Upload</a>
         <span className="mx-1">·</span>
         <a className="underline" href="/compose">Compose</a>
+        <span className="mx-1">·</span>
+        <a className="underline" href="/brush">Smart Brush</a>
       </div>
     </div>
   );

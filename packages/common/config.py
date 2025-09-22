@@ -13,7 +13,7 @@ BUCKET_PROCESSED = env("GCS_BUCKET_PROCESSED", "recontent-processed")
 BUCKET_PUBLISHED = env("GCS_BUCKET_PUBLISHED", "recontent-published")
 PUBSUB_TOPIC_JOBS = env("PUBSUB_TOPIC_JOBS", "jobs")
 MOCK_AI = env("MOCK_AI", "1") == "1"
-GEMINI_IMAGE_MODEL_ID = env("GEMINI_IMAGE_MODEL_ID", "gemini-2.5-flash-image-preview")
+GEMINI_IMAGE_MODEL_ID = env("GEMINI_IMAGE_MODEL_ID", "gemini-1.5-flash-002")
 GEMINI_TEXT_MODEL_ID = env("GEMINI_TEXT_MODEL_ID", "gemini-2.5-flash")
 IMAGEN_MODEL_ID = env("IMAGEN_MODEL_ID", "imagen-3.0")
 
