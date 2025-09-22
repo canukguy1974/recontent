@@ -1,59 +1,70 @@
 "use client";
 import { useState } from "react";
 
+
 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
+
 export default function Compose() {
-  const [orgId, setOrgId] = useState(1);
-  const [userId, setUserId] = useState(1);
-  const [agentUri, setAgentUri] = useState("");
-  const [roomUri, setRoomUri] = useState("");
-  const [brief, setBrief] = useState("Agent in living room, natural light.");
-
+  const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const compose = async () => {
-    setStatus("Queuing job…");
-    const res = await fetch(`${apiBase}/jobs/composite`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ org_id: orgId, user_id: userId, agent_gcs: agentUri, room_gcs: roomUri, brief }),
-    });
-    if (!res.ok) {
-      setStatus("Failed to queue");
-      return;
-    }
-    setStatus("Queued! Check worker logs or outputs below (if mocked).");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("");
+    setLoading(true);
+    setResult(null);
+    // TODO: Call backend API for NLP processing
+    // Example placeholder
+    setTimeout(() => {
+      setResult({
+        imageUrl: "https://placehold.co/600x400?text=Composed+Image",
+        caption: "Open house Sat and Sun 1-4 at 500 Some Street",
+        facts: [
+          "Spacious living room with natural light",
+          "Recently renovated kitchen with modern appliances"
+        ],
+        cta: "Contact us to schedule a tour!"
+      });
+      setLoading(false);
+    }, 1200);
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Compose (Agent in Scene)</h1>
-      <div className="mt-3 grid max-w-2xl gap-2">
-        <label className="block text-sm"> 
-          Org ID
-          <input className="ml-2 w-24 rounded border px-2 py-1" type="number" value={orgId} onChange={(e) => setOrgId(parseInt(e.target.value, 10) || 1)} />
-        </label>
-        <label className="block text-sm">
-          User ID
-          <input className="ml-2 w-24 rounded border px-2 py-1" type="number" value={userId} onChange={(e) => setUserId(parseInt(e.target.value, 10) || 1)} />
-        </label>
-        <label className="block text-sm">
-          Agent GCS URI
-          <input className="mt-1 w-full rounded border px-2 py-1" value={agentUri} onChange={(e) => setAgentUri(e.target.value)} placeholder="gs://recontent-raw/org_1/agent.jpg" />
-        </label>
-        <label className="block text-sm">
-          Room GCS URI
-          <input className="mt-1 w-full rounded border px-2 py-1" value={roomUri} onChange={(e) => setRoomUri(e.target.value)} placeholder="gs://recontent-raw/org_1/room.jpg" />
-        </label>
-        <label className="block text-sm">
-          Brief
-          <input className="mt-1 w-full rounded border px-2 py-1" value={brief} onChange={(e) => setBrief(e.target.value)} />
-        </label>
-        <button className="mt-3 inline-flex items-center rounded-md bg-black px-3 py-1.5 text-sm text-white" onClick={compose}>Run Composite</button>
-      </div>
-      <p className="mt-2 text-sm text-gray-700">{status}</p>
-      <p className="mt-6 text-sm">Need to upload images first? <a className="underline text-blue-700" href="/upload">Upload</a></p>
+    <div className="max-w-2xl mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-4">Compose Listing Content</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <textarea
+          className="w-full min-h-[120px] rounded border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Describe what you want to create. E.g. 'use colin1 in listing address 500 some street/living room add colin1 to be standing in the room and furnish the empty room with modern contemporary furniture and add captions ...'"
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          required
+        />
+        <button
+          type="submit"
+          className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-white font-semibold hover:bg-blue-700 disabled:opacity-60"
+          disabled={loading || !prompt.trim()}
+        >
+          {loading ? "Generating..." : "Generate"}
+        </button>
+      </form>
+      {status && <p className="mt-2 text-sm text-gray-700">{status}</p>}
+      {result && (
+        <div className="mt-8 border rounded-lg p-4 bg-gray-50">
+          <img src={result.imageUrl} alt="Composed" className="w-full max-w-md rounded shadow mb-4" />
+          <div className="mb-2 text-lg font-semibold">Caption:</div>
+          <div className="mb-4 text-gray-800">{result.caption}</div>
+          <div className="mb-2 text-lg font-semibold">Engaging Facts:</div>
+          <ul className="list-disc ml-6 mb-4 text-gray-800">
+            {result.facts.map((fact: string, i: number) => <li key={i}>{fact}</li>)}
+          </ul>
+          <div className="mb-2 text-lg font-semibold">Call to Action:</div>
+          <div className="text-blue-700 font-bold">{result.cta}</div>
+        </div>
+      )}
     </div>
   );
 }

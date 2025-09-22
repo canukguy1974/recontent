@@ -22,6 +22,58 @@
   - `npm run dev`
   - Open `http://localhost:3000`
 
+Shortcut targets (Makefile)
+- From repo root (preferred):
+  - `make run-api`     → Start API (8080)
+  - `make run-worker`  → Start Worker (8081)
+  - `make run-web`     → Start Web (3000)
+  - `make stop-api`    → Kill API
+  - `make stop-worker` → Kill Worker
+  - `make stop-web`    → Kill Web
+  - `make restart-api` → Stop then start API
+  - `make restart-worker` → Stop then start Worker
+
+- From apps/web (forwarders added):
+  - Same targets are available; they call into the root Makefile.
+
+### Stop/Restart Quickly (Linux)
+- Stop API (uvicorn on 8080):
+  ```bash
+  # by process name
+  pkill -f "uvicorn services.api.main:app" || true
+  # or by port
+  lsof -ti:8080 | xargs -r kill -9
+  # or
+  fuser -k 8080/tcp || true
+  ```
+
+- Stop Worker (uvicorn on 8081):
+  ```bash
+  pkill -f "uvicorn services.worker.main:app" || true
+  lsof -ti:8081 | xargs -r kill -9
+  fuser -k 8081/tcp || true
+  ```
+
+- Stop Web (Next.js dev on 3000):
+  ```bash
+  lsof -ti:3000 | xargs -r kill -9
+  fuser -k 3000/tcp || true
+  ```
+
+- Inspect who is using a port:
+  ```bash
+  ss -ltnp | grep -E ':3000|:8080|:8081'
+  ps aux | grep -E 'uvicorn|node|next' | grep -v grep
+  ```
+
+- Restart API/Worker after stopping:
+  ```bash
+  # API
+  uvicorn services.api.main:app --reload --port 8080
+  # Worker
+  uvicorn services.worker.main:app --reload --port 8081
+  ```
+
 ### GCS Signed URL Flow
 - Get signed PUT URL:
   - `curl "http://localhost:8080/assets/upload-url?org_id=1&content_type=image%2Fjpeg"`
@@ -45,7 +97,17 @@
 - Worker handles `type: composite` messages at `/pubsub` and calls processors to generate outputs.
 
 ### Environment
-- Local GCP creds: `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`
+- Local GCP creds (ADC):
+  - Put your service account JSON somewhere safe, e.g., `~/keys/recontent-sa.json`.
+  - Either export it in your shell:
+    ```bash
+    export GOOGLE_APPLICATION_CREDENTIALS=~/keys/recontent-sa.json
+    ```
+    or set it in `.env` at repo root (Make targets auto-load `.env`):
+    ```bash
+    GOOGLE_APPLICATION_CREDENTIALS=~/keys/recontent-sa.json
+    ```
+  - Verify: `python -c "from google.cloud import storage; storage.Client(); print('OK')"`
 - Allowed CORS origins for API: `ALLOWED_ORIGINS` (comma-separated, default `http://localhost:3000`)
 - Buckets and project are configured in `packages/common/config.py`
 
