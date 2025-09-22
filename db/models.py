@@ -46,6 +46,8 @@ class Org(Base):
     plan = Column(Enum(Plan), nullable=False)
     weekly_limit = Column(Integer, nullable=False, default=2)
     status = Column(String, default="active")
+    stripe_customer_id = Column(String, unique=True)
+    stripe_subscription_id = Column(String, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class User(Base):

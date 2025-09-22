@@ -51,6 +51,193 @@ class VertexAIClient:
         )
         return resp.text.strip()
     
+    def analyze_editing_instruction(self, prompt: str, image_context: str = None) -> dict:
+        """Analyze natural language editing instructions using AI to detect complex operations"""
+        try:
+            analysis_prompt = f"""
+            Analyze this image editing instruction and return a structured analysis in JSON format:
+            
+            Instruction: "{prompt}"
+            {f"Image context: {image_context}" if image_context else ""}
+            
+            Identify:
+            1. Primary operation type: remove, replace, modify, enhance, color_change, lighting_adjust, texture_change, style_transfer
+            2. Target elements: what specific objects/areas to edit (e.g., "furniture", "walls", "couch", "lighting")
+            3. Operation parameters: specific details like colors, materials, styles
+            4. Confidence score: 0.0-1.0 for how clear the instruction is
+            5. Fallback operation: simpler operation if primary fails
+            
+            Return ONLY valid JSON in this exact format:
+            {{
+                "primary_operation": "operation_type",
+                "target_elements": ["element1", "element2"],
+                "parameters": {{
+                    "color": "color_name_if_applicable",
+                    "material": "material_if_applicable", 
+                    "style": "style_if_applicable",
+                    "intensity": "low/medium/high_if_applicable"
+                }},
+                "confidence": 0.85,
+                "fallback_operation": "simpler_operation",
+                "reasoning": "brief explanation of analysis"
+            }}
+            """
+            
+            response = self.text_model.generate_content(analysis_prompt)
+            
+            # Parse the JSON response
+            import json
+            result = json.loads(response.text.strip())
+            
+            # Validate required fields
+            if not all(key in result for key in ["primary_operation", "target_elements", "confidence"]):
+                raise ValueError("Invalid analysis format returned")
+                
+            return result
+            
+        except Exception as e:
+            print(f"Error in AI instruction analysis: {e}")
+            # Fallback to basic keyword matching
+            return self._fallback_operation_detection(prompt)
+    
+    def generate_enhanced_content(self, prompt: str, composition_type: str, operation_analysis: dict = None, 
+                                 agent_info: dict = None, property_context: dict = None) -> dict:
+        """Generate personalized marketing content using AI analysis"""
+        try:
+            # Build context for AI content generation
+            context_parts = [
+                f"Property visualization: {prompt}",
+                f"Composition type: {composition_type}"
+            ]
+            
+            if operation_analysis:
+                context_parts.append(f"Image modifications: {operation_analysis.get('reasoning', 'Standard processing')}")
+                
+            if property_context:
+                if property_context.get('room_type'):
+                    context_parts.append(f"Room type: {property_context['room_type']}")
+                if property_context.get('style'):
+                    context_parts.append(f"Style: {property_context['style']}")
+                if property_context.get('staging_status'):
+                    context_parts.append(f"Staging: {property_context['staging_status']}")
+                    
+            if agent_info:
+                if agent_info.get('name'):
+                    context_parts.append(f"Agent: {agent_info['name']}")
+                if agent_info.get('specialization'):
+                    context_parts.append(f"Specialization: {agent_info['specialization']}")
+            
+            context_summary = ". ".join(context_parts)
+            
+            # Generate AI-powered content
+            content_prompt = f"""
+            As a professional real estate marketing expert, create engaging social media content for this property visualization:
+            
+            Context: {context_summary}
+            
+            Generate content in this JSON format:
+            {{
+                "caption": "Engaging 180-220 character caption with 3-5 relevant hashtags",
+                "facts": ["Fact 1 about the property/space", "Fact 2 highlighting key features", "Fact 3 about benefits/appeal"],
+                "cta": "Compelling call-to-action that encourages engagement"
+            }}
+            
+            Requirements:
+            - Caption: Professional yet engaging, focus on lifestyle benefits and visual appeal
+            - Facts: Specific, compelling, and relevant to the space/modifications shown
+            - CTA: Action-oriented and contextually appropriate 
+            - Include virtual staging disclosure if staging was mentioned
+            - Use real estate best practices for social media engagement
+            
+            Return ONLY valid JSON.
+            """
+            
+            response = self.text_model.generate_content(content_prompt)
+            
+            # Debug: Log the raw response
+            raw_response = response.text.strip()
+            print(f"Raw AI response: {raw_response[:200]}...")
+            
+            # Clean the response - remove markdown code fences if present
+            cleaned_response = raw_response
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.startswith("```"):
+                cleaned_response = cleaned_response[3:]   # Remove ```
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+            
+            cleaned_response = cleaned_response.strip()
+            print(f"Cleaned response: {cleaned_response[:200]}...")
+            
+            # Parse the JSON response
+            import json
+            result = json.loads(cleaned_response)
+            
+            # Validate required fields
+            if not all(key in result for key in ["caption", "facts", "cta"]):
+                raise ValueError("Invalid content format returned")
+                
+            return result
+            
+        except Exception as e:
+            print(f"Error in AI content generation: {e}")
+            # Fallback to basic content generation
+            return self._fallback_content_generation(prompt, composition_type)
+    
+    def _fallback_content_generation(self, prompt: str, composition_type: str) -> dict:
+        """Fallback content generation using the existing caption method"""
+        staged = composition_type in ["virtual_staging", "smart_edit"] or "staging" in prompt.lower()
+        
+        return {
+            "caption": self.caption(prompt, staged=staged),
+            "facts": [
+                "Prime location with excellent amenities",
+                "Move-in ready condition",
+                "Professional photography highlights key features"
+            ],
+            "cta": "Contact us for more information and to schedule a viewing!"
+        }
+    
+    def _fallback_operation_detection(self, prompt: str) -> dict:
+        """Fallback to basic keyword matching if AI analysis fails"""
+        operation = "modify"
+        target_elements = ["object"]
+        confidence = 0.6
+        
+        # Basic keyword matching (original logic)
+        if any(word in prompt.lower() for word in ["remove", "delete", "erase"]):
+            operation = "remove"
+            confidence = 0.8
+        elif any(word in prompt.lower() for word in ["replace", "change", "swap"]):
+            operation = "replace"
+            confidence = 0.7
+        elif any(word in prompt.lower() for word in ["brighten", "darken", "lighting"]):
+            operation = "lighting_adjust"
+            confidence = 0.7
+        elif any(word in prompt.lower() for word in ["color", "paint", "recolor"]):
+            operation = "color_change"
+            confidence = 0.7
+        
+        # Basic target detection
+        if "furniture" in prompt.lower():
+            target_elements = ["furniture"]
+        elif "wall" in prompt.lower():
+            target_elements = ["wall"]
+        elif any(word in prompt.lower() for word in ["couch", "sofa"]):
+            target_elements = ["couch"]
+        elif any(word in prompt.lower() for word in ["lighting", "light"]):
+            target_elements = ["lighting"]
+        
+        return {
+            "primary_operation": operation,
+            "target_elements": target_elements,
+            "parameters": {},
+            "confidence": confidence,
+            "fallback_operation": "modify",
+            "reasoning": "Fallback keyword matching used"
+        }
+    
     def inpaint(self, source_image_bytes: bytes, mask_image_bytes: bytes, prompt: str) -> bytes:
         """Apply AI-powered inpainting to edit specific regions of an image"""
         try:

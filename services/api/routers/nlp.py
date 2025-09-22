@@ -62,14 +62,56 @@ async def compose_content(req: ComposeRequest):
             image_url = await generate_image_from_prompt(req.prompt, req.org_id or 1)
             staged = "staging" in req.prompt.lower() or "furnished" in req.prompt.lower()
         
-        # Generate marketing content using the same AI
-        caption = _ai.caption(req.prompt, staged=staged)
+        # Generate enhanced AI-powered marketing content
+        print(f"MOCK_AI status: {MOCK_AI}")
         
-        # Generate engaging facts based on the prompt
-        facts = generate_facts_from_prompt(req.prompt)
-        
-        # Generate appropriate CTA
-        cta = generate_cta_from_prompt(req.prompt)
+        if not MOCK_AI:
+            try:
+                print("Attempting AI-powered content generation...")
+                # Build property context from prompt analysis
+                property_context = extract_property_context(req.prompt, req.composition_type)
+                print(f"Property context: {property_context}")
+                
+                # Build agent info if available (placeholder for future user integration)
+                agent_info = {
+                    "name": "Professional Agent",  # TODO: Get from user profile
+                    "specialization": infer_agent_specialization(req.prompt)
+                }
+                print(f"Agent info: {agent_info}")
+                
+                # Get operation analysis for smart edits (if available from previous analysis)
+                operation_analysis = None
+                if req.composition_type == "smart_edit" and req.edit_instruction:
+                    operation_analysis = {"reasoning": f"Smart editing applied: {req.edit_instruction}"}
+                
+                # Generate AI-powered content
+                ai_content = _ai.generate_enhanced_content(
+                    req.prompt, 
+                    req.composition_type,
+                    operation_analysis=operation_analysis,
+                    agent_info=agent_info,
+                    property_context=property_context
+                )
+                
+                print(f"AI content generated: {ai_content}")
+                caption = ai_content["caption"]
+                facts = ai_content["facts"]
+                cta = ai_content["cta"]
+                
+            except Exception as e:
+                print(f"AI content generation failed, falling back to basic: {e}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to basic content generation
+                caption = _ai.caption(req.prompt, staged=staged)
+                facts = generate_facts_from_prompt(req.prompt)
+                cta = generate_cta_from_prompt(req.prompt)
+        else:
+            print("Using mock mode - basic content generation")
+            # Mock mode uses basic content generation
+            caption = _ai.caption(req.prompt, staged=staged)
+            facts = generate_facts_from_prompt(req.prompt)
+            cta = generate_cta_from_prompt(req.prompt)
         
         return ComposeResponse(
             image_url=image_url,
@@ -194,39 +236,95 @@ async def generate_virtual_staging(room_gcs: str, prompt: str, org_id: int) -> s
         return f"https://placehold.co/600x400/E67E22/FFFFFF?text=Staging+Error+{str(e)[:10]}"
 
 async def generate_smart_edit(image_gcs: str, mask_data: str, edit_instruction: str, org_id: int) -> str:
-    """Apply intelligent editing to specific areas using brush masks and NLP instructions"""
+    """Apply intelligent editing to specific areas using brush masks and AI-powered NLP instructions"""
     try:
         import base64
         
         unique_id = str(uuid4())[:8]
         
-        # Parse the edit instruction to understand the operation
-        operation = "modify"  # default
-        if any(word in edit_instruction.lower() for word in ["remove", "delete", "erase"]):
-            operation = "remove"
-        elif any(word in edit_instruction.lower() for word in ["replace", "change", "swap"]):
-            operation = "replace"
-        elif any(word in edit_instruction.lower() for word in ["brighten", "darken", "lighting"]):
-            operation = "lighting"
-        elif any(word in edit_instruction.lower() for word in ["color", "paint", "recolor"]):
-            operation = "recolor"
-        
-        # Detect what object/area is being edited (this would use computer vision in production)
-        likely_object = "object"
-        if "furniture" in edit_instruction.lower():
-            likely_object = "furniture"
-        elif "wall" in edit_instruction.lower():
-            likely_object = "wall"
-        elif "couch" in edit_instruction.lower() or "sofa" in edit_instruction.lower():
-            likely_object = "couch"
-        elif "lighting" in edit_instruction.lower() or "light" in edit_instruction.lower():
-            likely_object = "lighting"
-        elif "counter" in edit_instruction.lower():
-            likely_object = "counter"
+        # Use AI-powered operation detection instead of basic keyword matching
+        if not MOCK_AI:
+            try:
+                # Analyze the edit instruction using Vertex AI
+                operation_analysis = _ai.analyze_editing_instruction(
+                    edit_instruction, 
+                    image_context=f"Image source: {image_gcs.split('/')[-1] if '/' in image_gcs else 'external'}"
+                )
+                
+                operation = operation_analysis.get("primary_operation", "modify")
+                target_elements = operation_analysis.get("target_elements", ["object"])
+                parameters = operation_analysis.get("parameters", {})
+                confidence = operation_analysis.get("confidence", 0.5)
+                reasoning = operation_analysis.get("reasoning", "AI analysis completed")
+                
+                print(f"AI Operation Analysis - Operation: {operation}, Targets: {target_elements}, Confidence: {confidence:.2f}")
+                print(f"Analysis reasoning: {reasoning}")
+                
+                # Use primary target or first element
+                likely_object = target_elements[0] if target_elements else "object"
+                
+            except Exception as e:
+                print(f"AI analysis failed, falling back to basic detection: {e}")
+                # Fallback to basic keyword matching
+                operation = "modify"
+                likely_object = "object"
+                confidence = 0.3
+                parameters = {}
+                
+                if any(word in edit_instruction.lower() for word in ["remove", "delete", "erase"]):
+                    operation = "remove"
+                    confidence = 0.6
+                elif any(word in edit_instruction.lower() for word in ["replace", "change", "swap"]):
+                    operation = "replace"
+                    confidence = 0.6
+                elif any(word in edit_instruction.lower() for word in ["brighten", "darken", "lighting"]):
+                    operation = "lighting_adjust"
+                    confidence = 0.6
+                elif any(word in edit_instruction.lower() for word in ["color", "paint", "recolor"]):
+                    operation = "color_change"
+                    confidence = 0.6
+                
+                # Basic target detection  
+                if "furniture" in edit_instruction.lower():
+                    likely_object = "furniture"
+                elif "wall" in edit_instruction.lower():
+                    likely_object = "wall"
+                elif "couch" in edit_instruction.lower() or "sofa" in edit_instruction.lower():
+                    likely_object = "couch"
+                elif "lighting" in edit_instruction.lower() or "light" in edit_instruction.lower():
+                    likely_object = "lighting"
+                elif "counter" in edit_instruction.lower():
+                    likely_object = "counter"
+        else:
+            # Basic fallback for mock mode
+            operation = "modify"
+            likely_object = "object"
+            confidence = 0.5
+            parameters = {}
+            
+            if any(word in edit_instruction.lower() for word in ["remove", "delete", "erase"]):
+                operation = "remove"
+            elif any(word in edit_instruction.lower() for word in ["replace", "change", "swap"]):
+                operation = "replace"
+            elif any(word in edit_instruction.lower() for word in ["brighten", "darken", "lighting"]):
+                operation = "lighting"
+            elif any(word in edit_instruction.lower() for word in ["color", "paint", "recolor"]):
+                operation = "recolor"
         
         if MOCK_AI:
-            # Create demonstration URL showing the smart edit details for mock mode
-            demo_url = f"https://placehold.co/800x600/9B59B6/FFFFFF?text=Smart+Edit+{unique_id}+%0AOperation:%20{operation.title()}+%0ATarget:%20{likely_object.title()}+%0ASource:%20{image_gcs.split('/')[-1][:12]}"
+            # Create enhanced demonstration URL showing AI analysis results
+            params_str = ""
+            if parameters:
+                param_parts = []
+                if "color" in parameters:
+                    param_parts.append(f"Color:{parameters['color']}")
+                if "material" in parameters:
+                    param_parts.append(f"Material:{parameters['material']}")
+                if "style" in parameters:
+                    param_parts.append(f"Style:{parameters['style']}")
+                params_str = f"+%0AParams:{'+'.join(param_parts)}" if param_parts else ""
+            
+            demo_url = f"https://placehold.co/800x600/9B59B6/FFFFFF?text=AI+Smart+Edit+{unique_id}+%0AOperation:{operation.title()}+%0ATarget:{likely_object.title()}+%0AConfidence:{confidence:.2f}{params_str}+%0ASource:{image_gcs.split('/')[-1][:12] if '/' in image_gcs else 'external'}"
             return demo_url
         
         # Real AI-powered inpainting implementation
@@ -243,16 +341,23 @@ async def generate_smart_edit(image_gcs: str, mask_data: str, edit_instruction: 
                 with urllib.request.urlopen(image_gcs) as response:
                     source_bytes = response.read()
             
-            # Step 3: Use Vertex AI Imagen for inpainting
-            edited_image_bytes = _ai.inpaint(source_bytes, mask_bytes, edit_instruction)
+            # Step 3: Create enhanced inpainting prompt using AI analysis
+            enhanced_prompt = create_enhanced_inpainting_prompt(
+                edit_instruction, operation, likely_object, parameters
+            )
             
-            # Step 4: Upload result to GCS
+            print(f"Enhanced inpainting prompt: {enhanced_prompt}")
+            
+            # Step 4: Use Vertex AI Imagen for inpainting with enhanced prompt
+            edited_image_bytes = _ai.inpaint(source_bytes, mask_bytes, enhanced_prompt)
+            
+            # Step 5: Upload result to GCS
             result_filename = f"smart_edit_{unique_id}_{operation}_{org_id}.jpg"
             result_gcs_uri = f"gs://{BUCKET_PROCESSED}/org_{org_id}/{result_filename}"
             
             upload_bytes(result_gcs_uri, edited_image_bytes, "image/jpeg")
             
-            # Step 5: Return signed URL for the edited image  
+            # Step 6: Return signed URL for the edited image  
             from packages.common.gcs import get_signed_url
             signed_url = get_signed_url(result_gcs_uri, expiration_minutes=60)
             
@@ -267,6 +372,59 @@ async def generate_smart_edit(image_gcs: str, mask_data: str, edit_instruction: 
     except Exception as e:
         print(f"Error in smart editing: {e}")
         return f"https://placehold.co/600x400/E74C3C/FFFFFF?text=Edit+Error+{str(e)[:10]}"
+
+def create_enhanced_inpainting_prompt(original_instruction: str, operation: str, target_object: str, parameters: dict) -> str:
+    """Create an enhanced inpainting prompt based on AI analysis results"""
+    
+    # Base professional real estate editing prompt
+    base_prompt = "Professional real estate photography edit:"
+    
+    # Operation-specific enhancements
+    operation_prompts = {
+        "remove": f"Cleanly remove {target_object} from the scene. Fill the area naturally with appropriate background elements that match the surrounding environment.",
+        "replace": f"Replace {target_object} with a suitable alternative that fits the space and style.",
+        "color_change": f"Change the color of {target_object} while maintaining realistic lighting and shadows.",
+        "lighting_adjust": f"Adjust the lighting on {target_object} to enhance the overall scene brightness and appeal.",
+        "texture_change": f"Change the material/texture of {target_object} while preserving its form and proportions.",
+        "style_transfer": f"Transform {target_object} to match a different style while maintaining functional realism.",
+        "enhance": f"Enhance {target_object} to look more appealing and professional for real estate marketing.",
+        "modify": f"Modify {target_object} according to the specific instructions provided."
+    }
+    
+    operation_prompt = operation_prompts.get(operation, operation_prompts["modify"])
+    
+    # Add parameter-specific details
+    parameter_details = []
+    if parameters.get("color"):
+        parameter_details.append(f"Use {parameters['color']} color")
+    if parameters.get("material"):
+        parameter_details.append(f"Apply {parameters['material']} material/texture")
+    if parameters.get("style"):
+        parameter_details.append(f"Follow {parameters['style']} design style")
+    if parameters.get("intensity"):
+        intensity = parameters['intensity']
+        if intensity == "high":
+            parameter_details.append("Make the changes prominent and clearly visible")
+        elif intensity == "low":
+            parameter_details.append("Apply subtle, natural-looking changes")
+        else:  # medium
+            parameter_details.append("Apply moderate, balanced changes")
+    
+    # Combine all elements
+    enhanced_parts = [
+        base_prompt,
+        operation_prompt,
+        f"Original instruction: '{original_instruction}'",
+        ". ".join(parameter_details) if parameter_details else "",
+        "Maintain realistic lighting, perspective, and architectural accuracy.",
+        "Ensure the result looks professional and suitable for MLS listings.",
+        "High quality, natural appearance, no obvious editing artifacts."
+    ]
+    
+    # Filter out empty parts and join
+    enhanced_prompt = " ".join(part for part in enhanced_parts if part.strip())
+    
+    return enhanced_prompt
 
 def generate_facts_from_prompt(prompt: str) -> List[str]:
     """Extract or generate relevant facts from the prompt"""
@@ -335,3 +493,78 @@ def generate_cta_from_prompt(prompt: str) -> str:
         return "Book your virtual or in-person tour now!"
     else:
         return "Contact us for more information and to schedule a viewing!"
+
+def extract_property_context(prompt: str, composition_type: str) -> dict:
+    """Extract property context from prompt for enhanced content generation"""
+    context = {}
+    
+    # Detect room type
+    room_types = {
+        "living room": ["living", "lounge", "family room"],
+        "kitchen": ["kitchen", "cooking", "culinary"],
+        "bedroom": ["bedroom", "master bedroom", "guest room"],
+        "bathroom": ["bathroom", "bath", "powder room"],
+        "dining room": ["dining", "eat-in"],
+        "office": ["office", "study", "workspace"],
+        "outdoor": ["patio", "deck", "garden", "outdoor", "backyard"]
+    }
+    
+    for room_type, keywords in room_types.items():
+        if any(keyword in prompt.lower() for keyword in keywords):
+            context["room_type"] = room_type
+            break
+    
+    # Detect style preferences
+    styles = {
+        "scandinavian": ["scandinavian", "nordic", "hygge"],
+        "modern": ["modern", "contemporary", "sleek"],
+        "traditional": ["traditional", "classic", "timeless"],
+        "minimalist": ["minimalist", "clean", "simple"],
+        "luxury": ["luxury", "upscale", "premium", "high-end"],
+        "rustic": ["rustic", "farmhouse", "country"],
+        "industrial": ["industrial", "loft", "urban"]
+    }
+    
+    for style, keywords in styles.items():
+        if any(keyword in prompt.lower() for keyword in keywords):
+            context["style"] = style
+            break
+    
+    # Detect staging status
+    if composition_type in ["virtual_staging"] or any(word in prompt.lower() for word in ["staging", "furnished", "virtual"]):
+        context["staging_status"] = "virtually_staged"
+    elif composition_type == "smart_edit":
+        context["staging_status"] = "enhanced"
+    else:
+        context["staging_status"] = "as_is"
+    
+    # Detect property features
+    features = []
+    if any(word in prompt.lower() for word in ["natural light", "bright", "sunny"]):
+        features.append("natural_light")
+    if any(word in prompt.lower() for word in ["spacious", "large", "open"]):
+        features.append("spacious")
+    if any(word in prompt.lower() for word in ["updated", "renovated", "new"]):
+        features.append("updated")
+    if any(word in prompt.lower() for word in ["hardwood", "marble", "granite"]):
+        features.append("premium_materials")
+    
+    if features:
+        context["features"] = features
+    
+    return context
+
+def infer_agent_specialization(prompt: str) -> str:
+    """Infer agent specialization based on prompt content"""
+    if any(word in prompt.lower() for word in ["luxury", "upscale", "premium", "high-end", "executive"]):
+        return "luxury_properties"
+    elif any(word in prompt.lower() for word in ["first-time", "starter", "affordable", "condo"]):
+        return "first_time_buyers"
+    elif any(word in prompt.lower() for word in ["investment", "rental", "income"]):
+        return "investment_properties"
+    elif any(word in prompt.lower() for word in ["commercial", "office", "retail"]):
+        return "commercial_real_estate"
+    elif any(word in prompt.lower() for word in ["waterfront", "lake", "ocean", "beach"]):
+        return "waterfront_properties"
+    else:
+        return "residential_specialist"
