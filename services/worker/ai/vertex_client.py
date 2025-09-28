@@ -313,3 +313,69 @@ class VertexAIClient:
         except Exception as e:
             print(f"Error creating fallback edit: {e}")
             return source_bytes
+    
+    async def analyze_image(self, image_bytes: bytes, prompt: str) -> str:
+        """Analyze a single image with AI and return structured analysis"""
+        try:
+            response = self.image_model.generate_content([
+                prompt,
+                Part.from_data(image_bytes, mime_type="image/jpeg")
+            ])
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error in image analysis: {e}")
+            # Return a fallback JSON structure
+            return '''
+            {
+                "image_type": "property",
+                "room_type": null,
+                "style": "modern",
+                "lighting": "natural",
+                "occupancy": "furnished",
+                "features": ["standard_features"],
+                "mood": "welcoming",
+                "quality_score": 0.75,
+                "confidence": 0.60
+            }
+            '''
+    
+    async def analyze_image_set(self, image_bytes_list: list[bytes], prompt: str) -> str:
+        """Analyze a set of images collectively with AI"""
+        try:
+            # Prepare image parts
+            content_parts = [prompt]
+            for i, image_bytes in enumerate(image_bytes_list):
+                content_parts.append(f"Image {i+1}:")
+                content_parts.append(Part.from_data(image_bytes, mime_type="image/jpeg"))
+            
+            response = self.image_model.generate_content(content_parts)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error in image set analysis: {e}")
+            # Return a fallback JSON structure
+            return '''
+            {
+                "relationships": [],
+                "property_story": "A collection of real estate images showcasing quality features and professional presentation",
+                "suggested_combinations": [
+                    {"images": [0, 1], "purpose": "property_showcase", "description": "Standard property presentation"}
+                ],
+                "marketing_themes": ["professional", "quality"],
+                "target_audience": ["homebuyers"],
+                "content_strategy": {
+                    "primary_message": "Quality real estate presentation",
+                    "posting_schedule": "standard",
+                    "platform_focus": ["facebook"]
+                },
+                "overall_confidence": 0.70
+            }
+            '''
+    
+    async def generate_text_response(self, prompt: str) -> str:
+        """Generate a text response using the text model"""
+        try:
+            response = self.text_model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error in text generation: {e}")
+            return "Error generating response"

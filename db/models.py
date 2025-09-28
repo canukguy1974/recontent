@@ -26,11 +26,27 @@ class AssetKind(enum.Enum):
     MASK = "mask"
     OUTPUT = "output"
 
+class UploadSource(enum.Enum):
+    DIRECT_UPLOAD = "direct_upload"
+    AI_GENERATED = "ai_generated"
+    AI_EDITED = "ai_edited"
+    IMPORTED = "imported"
+
+class ActionType(enum.Enum):
+    IMAGE_GENERATION = "image_generation"
+    IMAGE_EDITING = "image_editing"
+    CONTENT_GENERATION = "content_generation"
+    POST_COMBINATION = "post_combination"
+    SOCIAL_POSTS = "social_posts"
+
 class JobType(enum.Enum):
     COMPOSITE = "composite"
     STAGING = "staging"
     CAPTION = "caption"
     PUBLISH = "publish"
+    ANALYZE_SET = "analyze_set"
+    COMBINE_POST = "combine_post"
+    GENERATE_SOCIAL = "generate_social"
 
 class JobStatus(enum.Enum):
     CREATED = "created"
@@ -72,7 +88,16 @@ class Asset(Base):
     checksum = Column(String)
     staged = Column(Boolean, default=False)
     contains_people = Column(Boolean, default=False)
+    # New fields for Phase 1
+    tags = Column(JSON, default=list)
+    label = Column(String)
+    upload_source = Column(Enum(UploadSource), default=UploadSource.DIRECT_UPLOAD)
+    parent_asset_id = Column(Integer, ForeignKey("assets.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    parent_asset = relationship("Asset", remote_side=[id])
+    child_assets = relationship("Asset")
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -109,3 +134,34 @@ class Quota(Base):
     window_end = Column(DateTime, nullable=False)
     weekly_limit = Column(Integer, nullable=False, default=2)
     used_count = Column(Integer, default=0)
+
+class UsageLog(Base):
+    __tablename__ = "usage_logs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    org_id = Column(Integer, ForeignKey("orgs.id"), nullable=False)
+    action_type = Column(Enum(ActionType), nullable=False)
+    credits_used = Column(Integer, default=1)
+    job_id = Column(BigInteger, ForeignKey("jobs.id"))
+    asset_id = Column(Integer, ForeignKey("assets.id"))
+    extra_data = Column(JSON, default=dict)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    org = relationship("Org")
+    job = relationship("Job")
+    asset = relationship("Asset")
+
+class CreditBalance(Base):
+    __tablename__ = "credit_balances"
+    org_id = Column(Integer, ForeignKey("orgs.id"), primary_key=True)
+    available_credits = Column(Integer, default=0)
+    used_this_period = Column(Integer, default=0)
+    period_start = Column(DateTime, nullable=False)
+    period_end = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    org = relationship("Org")

@@ -1,0 +1,74 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://test:test@localhost:5432/test
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      # Add other required env vars here
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: |
+          cd services/api
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: |
+          cd services/api
+          pytest
+
+      - name: Install frontend dependencies
+        run: |
+          cd apps/web
+          npm install --no-audit --no-fund
+
+      - name: Run frontend tests
+        run: |
+          cd apps/web
+          npm test
+
+      # Optionally, add build and deploy steps here
+
+      - name: Lint backend
+        run: |
+          cd services/api
+          make lint-api
+
+      - name: Lint frontend
+        run: |
+          cd apps/web
+          npm run lint

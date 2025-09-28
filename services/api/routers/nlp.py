@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
@@ -11,6 +12,11 @@ from services.worker.ai.mock_client import MockAIClient
 from services.worker.ai.vertex_client import VertexAIClient
 from packages.common.config import MOCK_AI, BUCKET_PROCESSED, GOOGLE_CLOUD_PROJECT
 from packages.common.gcs import upload_bytes, get_signed_url, download_bytes
+
+# Import rate limiting and dependencies
+from services.api.deps import get_db, get_current_user
+from services.api.middleware.rate_limiting import require_content_generation_credits, require_image_generation_credits
+from db.models import User, UsageLog
 
 router = APIRouter()
 
@@ -36,7 +42,12 @@ class ComposeResponse(BaseModel):
     cta: str
 
 @router.post("/compose", response_model=ComposeResponse)
-async def compose_content(req: ComposeRequest):
+@require_image_generation_credits()
+async def compose_content(
+    req: ComposeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Generate AI-powered real estate content from natural language prompts"""
     try:
         # Determine composition type and generate appropriate image

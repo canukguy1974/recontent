@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from services.api.routers import health, uploads, jobs, stripe_webhooks, nlp
+from services.api.routers import health, uploads, jobs, stripe_webhooks, nlp, user_assets, credits, combination_agent
+from services.api.middleware.rate_limiting import RateLimitingMiddleware
 from packages.common.logging import get_logger
 import os
 
@@ -37,3 +38,9 @@ app.include_router(uploads.router, prefix="/assets", tags=["assets"])
 app.include_router(jobs.router, tags=["jobs"])
 app.include_router(stripe_webhooks.router, tags=["billing"])
 app.include_router(nlp.router, prefix="/nlp", tags=["nlp"])
+app.include_router(user_assets.router, prefix="/user", tags=["user-assets"])
+app.include_router(credits.router, prefix="/credits", tags=["credits"])
+app.include_router(combination_agent.router, prefix="/combination-agent", tags=["combination-agent"])
+
+# Add rate limiting middleware
+app.add_middleware(RateLimitingMiddleware)
